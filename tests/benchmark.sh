@@ -211,7 +211,10 @@ main() {
 	cp "$(last_save_file)" "$WORK_DIR/resaved.txt"
 	local diff_lines="$(diff <(normalize "$WORK_DIR/saved.txt") <(normalize "$WORK_DIR/resaved.txt") | grep -c '^[<>]')"
 	local roundtrip="ok"
-	[ "$diff_lines" -gt 0 ] && roundtrip="$diff_lines"
+	if [ "$diff_lines" -gt 0 ]; then
+		roundtrip="$diff_lines"
+		diff <(normalize "$WORK_DIR/saved.txt") <(normalize "$WORK_DIR/resaved.txt") | head -20 >&2
+	fi
 
 	echo "${panes},${windows},${save_time},${save_contents},${restore_time},${pane_create},${roundtrip}"
 }
