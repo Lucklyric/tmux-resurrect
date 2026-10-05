@@ -56,7 +56,7 @@ supported_tmux_version_ok() {
 }
 
 remove_first_char() {
-	echo "$1" | cut -c2-
+	echo "${1:1}"
 }
 
 capture_pane_contents_option_on() {
@@ -73,9 +73,78 @@ get_grouped_sessions() {
 	export GROUPED_SESSIONS="${d}$(echo "$grouped_sessions_dump" | cut -f2 -d"$d" | tr "\\n" "$d")"
 }
 
-is_session_grouped() {
-	local session_name="$1"
-	[[ "$GROUPED_SESSIONS" == *"${d}${session_name}${d}"* ]]
+# batched tmux commands
+#
+# Starting a tmux client for every single command is what makes saving and
+# restoring big environments slow. Commands queued with `tmux_batch_add` are
+# sent to the tmux server in chunks, as one command sequence: "cmd1 \; cmd2".
+
+TMUX_BATCH_ARGS=()
+TMUX_BATCH_COUNT=0
+TMUX_BATCH_BYTES=0
+TMUX_BATCH_OUTPUT=""
+# tmux refuses commands longer than ~16kB, stay well below that
+TMUX_BATCH_MAX_COUNT=100
+TMUX_BATCH_MAX_BYTES=8000
+
+tmux_batch_add() {
+	local arg
+	if [ "$TMUX_BATCH_COUNT" -gt 0 ]; then
+		TMUX_BATCH_ARGS+=(";")
+	fi
+	for arg in "$@"; do
+		# tmux takes a trailing ';' as a command separator, escape it
+		if [[ "$arg" == *";" ]]; then
+			arg="${arg%;}\\;"
+		fi
+		TMUX_BATCH_ARGS+=("$arg")
+		TMUX_BATCH_BYTES=$((TMUX_BATCH_BYTES + ${#arg} + 1))
+	done
+	TMUX_BATCH_COUNT=$((TMUX_BATCH_COUNT + 1))
+}
+
+_tmux_batch_reset() {
+	TMUX_BATCH_ARGS=()
+	TMUX_BATCH_COUNT=0
+	TMUX_BATCH_BYTES=0
+}
+
+# Runs queued commands once, their output is stored in TMUX_BATCH_OUTPUT.
+# tmux stops a command sequence at the first failing command.
+tmux_batch_run() {
+	TMUX_BATCH_OUTPUT=""
+	if [ "$TMUX_BATCH_COUNT" -gt 0 ]; then
+		TMUX_BATCH_OUTPUT="$(tmux "${TMUX_BATCH_ARGS[@]}" 2>/dev/null)"
+	fi
+	_tmux_batch_reset
+}
+
+# For queueing many commands that are safe to run more than once: the queue is
+# flushed automatically when it gets big and, if a chunk fails, its commands
+# are re-run one by one so that a single failure doesn't skip the rest.
+tmux_batch_queue() {
+	tmux_batch_add "$@"
+	if [ "$TMUX_BATCH_COUNT" -ge "$TMUX_BATCH_MAX_COUNT" ] ||
+		[ "$TMUX_BATCH_BYTES" -ge "$TMUX_BATCH_MAX_BYTES" ]; then
+		tmux_batch_flush
+	fi
+}
+
+tmux_batch_flush() {
+	if [ "$TMUX_BATCH_COUNT" -gt 0 ] &&
+		! tmux "${TMUX_BATCH_ARGS[@]}" >/dev/null 2>&1; then
+		local arg
+		local -a command=()
+		for arg in "${TMUX_BATCH_ARGS[@]}" ";"; do
+			if [ "$arg" == ";" ]; then
+				tmux "${command[@]}" >/dev/null 2>&1
+				command=()
+			else
+				command+=("$arg")
+			fi
+		done
+	fi
+	_tmux_batch_reset
 }
 
 # pane content file helpers
@@ -122,18 +191,7 @@ last_resurrect_file() {
 }
 
 pane_contents_dir() {
-	echo "$(resurrect_dir)/$1/pane_contents/"
-}
-
-pane_contents_file() {
-	local save_or_restore="$1"
-	local pane_id="$2"
-	echo "$(pane_contents_dir "$save_or_restore")/pane-${pane_id}"
-}
-
-pane_contents_file_exists() {
-	local pane_id="$1"
-	[ -f "$(pane_contents_file "restore" "$pane_id")" ]
+	echo "${_RESURRECT_DIR:-$(resurrect_dir)}/$1/pane_contents/"
 }
 
 pane_contents_archive_file() {
