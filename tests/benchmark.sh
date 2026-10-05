@@ -10,7 +10,7 @@
 #                      [-r runs] [-c]
 #
 #   -p  plugin directory to benchmark (default: this repository)
-#   -s  number of sessions                 (default: 10)
+#   -s  number of sessions                 (default: 6)
 #   -w  number of windows per session      (default: 10)
 #   -n  number of panes per window         (default: 4)
 #   -r  number of save runs, median is reported (default: 3)
@@ -30,7 +30,7 @@
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 PLUGIN_DIR="$CURRENT_DIR/.."
-SESSIONS=10
+SESSIONS=6
 WINDOWS=10
 PANES=4
 RUNS=3
@@ -92,6 +92,9 @@ set_options() {
 	t set -g @resurrect-dir "$WORK_DIR/resurrect"
 	t set -g @resurrect-processes '"~sleep->sleep *"'
 	t set -g history-limit 2000
+	# a plain shell, so startup time and title escapes of the user's shell
+	# don't affect timings and the roundtrip check
+	t set -g default-shell /bin/sh
 }
 
 # Each window gets its panes and a tiled layout with one tmux command. Every
@@ -122,7 +125,11 @@ create_environment() {
 }
 
 attach_client() {
-	sleep 600 | TERM=xterm script -qfc "tmux -L $SOCKET attach" /dev/null >/dev/null 2>&1 &
+	if [ "$(uname)" == "Darwin" ]; then
+		sleep 600 2>/dev/null | TERM=xterm script -q /dev/null tmux -L "$SOCKET" attach >/dev/null 2>&1 &
+	else
+		sleep 600 2>/dev/null | TERM=xterm script -qfc "tmux -L $SOCKET attach" /dev/null >/dev/null 2>&1 &
+	fi
 	CLIENT_PID=$!
 	sleep 1
 }
