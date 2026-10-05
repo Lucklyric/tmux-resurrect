@@ -33,7 +33,8 @@ restore_pane_process() {
 			command="$pane_full_command"
 		fi
 		tmux_batch_add send-keys -t "${session_name}:${window_number}.${pane_index}" "$command" "C-m"
-		# after 'send-keys', 'switch-client' fails if there's no client
+		# 'switch-client' fails when no client is attached. Thus it comes after
+		# 'send-keys'.
 		tmux_batch_add switch-client -t "${session_name}:${window_number}"
 		tmux_batch_add select-pane -t "${session_name}:${window_number}.${pane_index}"
 		tmux_batch_run
@@ -136,7 +137,7 @@ _get_proc_restore_command() {
 	fi
 }
 
-# Options are read once, not for every restored process.
+# Reads the options once, not once for every restored process.
 _cache_restore_options() {
 	if [ -n "$_RESTORE_OPTIONS_CACHED" ]; then
 		return
@@ -191,8 +192,8 @@ _get_command_strategy() {
 	echo "$_COMMAND_STRATEGY"
 }
 
-# Sets _COMMAND_STRATEGY. The strategy option is read from tmux only once for
-# each command, results are kept in _COMMAND_STRATEGIES.
+# Sets _COMMAND_STRATEGY. Reads the strategy option from tmux only once for
+# each command and keeps the results in _COMMAND_STRATEGIES.
 _COMMAND_STRATEGIES=$'\n'
 _lookup_command_strategy() {
 	local pane_full_command="$1"

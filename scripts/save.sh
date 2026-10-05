@@ -85,7 +85,7 @@ dump_panes_raw() {
 	tmux list-panes -a -F "$(pane_format)"
 }
 
-# window_id is appended, it's used for querying window options
+# Adds window_id at the end of each line. The window option queries use it.
 dump_windows_raw(){
 	tmux list-windows -a -F "$(window_format)${delimiter}#{window_id}"
 }
@@ -108,8 +108,8 @@ pane_contents_format() {
 	echo "$format"
 }
 
-# filters out (pane or window) lines of grouped sessions, session name is
-# expected in the 2nd field
+# Removes the pane or window lines of grouped sessions. The 2nd field must be
+# the session name.
 skip_grouped_sessions() {
 	awk -F "$delimiter" 'index(ENVIRON["GROUPED_SESSIONS"], FS $2 FS) == 0'
 }
@@ -135,7 +135,7 @@ _save_command_strategy_file() {
 pane_full_commands() {
 	local strategy_file="$(_save_command_strategy_file)"
 	if [ "$strategy_file" == "$CURRENT_DIR/../save_command_strategies/ps.sh" ]; then
-		# Same as the 'ps' strategy script, but the process list is fetched
+		# Same as the 'ps' strategy script, but it reads the process list
 		# only once instead of once for every pane.
 		awk '
 			FILENAME == ARGV[1] {
@@ -155,7 +155,7 @@ pane_full_commands() {
 		local pane_pid full_command
 		while read pane_pid; do
 			full_command="$($strategy_file "$pane_pid")"
-			# keep only the first line, others would break the save file
+			# keep only the first line. More lines would break the save file.
 			echo ":${full_command%%$'\n'*}"
 		done
 	fi
@@ -191,8 +191,8 @@ number_nonempty_lines_on_screens() {
 			'
 	)
 	_tmux_batch_reset
-	# a pane disappeared midway (tmux stops executing a command sequence on
-	# error), fall back to checking the remaining panes one by one
+	# If a pane disappeared during the sequence, tmux stopped at that error.
+	# Check the remaining panes one by one.
 	for pane_id in "${@:$((n + 1))}"; do
 		number_nonempty_lines_on_screen "$pane_id"
 	done
@@ -217,8 +217,8 @@ capture_panes_contents() {
 		tmux_batch_add capture-pane -epJ -S "${@:$((i + 1)):1}" -t "${@:$i:1}"
 		files+=("${@:$((i + 2)):1}")
 	done
-	# Splits the output on markers. Trailing empty lines are removed, same as
-	# in `capture_pane_contents`. Prints the number of markers seen.
+	# Splits the output at the markers. Removes trailing empty lines, the same
+	# as `capture_pane_contents`. Prints the number of markers found.
 	local captured="$(
 		tmux "${TMUX_BATCH_ARGS[@]}" 2>/dev/null |
 			awk -v marker="$marker" '
@@ -246,8 +246,8 @@ capture_panes_contents() {
 			' <(printf '%s\n' "${files[@]}") -
 	)"
 	_tmux_batch_reset
-	# a pane disappeared midway (tmux stops executing a command sequence on
-	# error), fall back to capturing the remaining panes one by one
+	# If a pane disappeared during the sequence, tmux stopped at that error.
+	# Capture the remaining panes one by one.
 	for ((i = captured; i < ${#files[@]}; i++)); do
 		capture_pane_contents "${@:$((i * 3 + 1)):3}"
 	done
@@ -308,9 +308,9 @@ dump_panes() {
 	done <<< "$panes" 3< <(echo "$panes" | cut -f11 -d"$d" | pane_full_commands)
 }
 
-# Reads window ids from stdin and prints the value of 'automatic-rename'
-# window option for each of them (":" if the option is unset), in the same
-# order.
+# Reads window ids from stdin. For each window, prints the value of the
+# 'automatic-rename' window option, in the same order. Prints ":" if the
+# option is not set.
 windows_automatic_rename() {
 	local -a window_ids=()
 	local window_id i
@@ -340,8 +340,8 @@ _windows_automatic_rename() {
 		fi
 	done <<< "$TMUX_BATCH_OUTPUT"
 	if [ "$((n + 1))" -ne "$#" ]; then
-		# a window disappeared midway (tmux stops executing a command sequence
-		# on error), fall back to querying windows one by one
+		# If a window disappeared during the sequence, tmux stopped at that
+		# error. Query the windows one by one.
 		values=()
 		for window_id in "$@"; do
 			values+=("$(tmux show-window-options -vt "$window_id" automatic-rename)")
@@ -379,7 +379,7 @@ dump_pane_contents() {
 			[ "$cursor_y" -gt 0 ]; then # cursor not in first line?
 			panes+=("${#pane_ids[@]}")
 		else
-			# the more expensive test (looking at the screen) is done later
+			# do the more expensive test (read the screen) later
 			unsure+=("${#pane_ids[@]}")
 		fi
 		pane_ids+=("$pane_id")
@@ -387,7 +387,7 @@ dump_pane_contents() {
 		files+=("${pane_contents_dir}/pane-${session_name}:${window_number}.${pane_index}")
 	done < <(tmux list-panes -a -F "$(pane_contents_format)" | skip_grouped_sessions)
 
-	# saving only panes with any command output
+	# save only the panes that have command output
 	for ((i = 0; i < ${#unsure[@]}; i += TMUX_BATCH_MAX_COUNT / 2)); do
 		local -a chunk=("${unsure[@]:$i:$((TMUX_BATCH_MAX_COUNT / 2))}")
 		local -a chunk_pane_ids=()
@@ -403,7 +403,7 @@ dump_pane_contents() {
 		done < <(number_nonempty_lines_on_screens "${chunk_pane_ids[@]}")
 	done
 
-	# capture in chunks, all of the contents go through a pipe
+	# capture in chunks. All of the contents go through a pipe.
 	local -a args=()
 	for i in "${panes[@]}"; do
 		if [ "$pane_contents_area" = "visible" ]; then
