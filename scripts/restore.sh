@@ -21,9 +21,9 @@ RESTORING_FROM_SCRATCH="false"
 RESTORE_PANE_CONTENTS="false"
 
 # Global variable.
-# Panes known to exist, one "session<tab>window<tab>pane" per line. The restore
-# adds each new pane to this list. Thus the pane, window and session checks do
-# not need a tmux command.
+# Panes known to exist, one "session<tab>window<tab>pane" per line. New panes
+# are added as they're created, so checking if a pane, window or session
+# exists doesn't need a tmux command.
 KNOWN_PANES=""
 
 is_line_type() {
@@ -131,8 +131,8 @@ cache_tmux_default_command() {
 	export TMUX_DEFAULT_COMMAND="$(get_tmux_option "default-command" "$opt$default_shell")"
 }
 
-# Sets PANE_CREATION_ARGS to the command for a new pane, if the pane contents
-# must be restored.
+# Sets PANE_CREATION_ARGS to the command for a new pane, if its contents are
+# restored.
 set_pane_creation_args() {
 	local session_name="$1"
 	local window_number="$2"
@@ -144,8 +144,8 @@ set_pane_creation_args() {
 	fi
 }
 
-# Queues a command that sets the pane title. It does this only if one of the
-# "new_" functions below got the title as its 5th argument.
+# queue setting the pane title if it was passed as the 5th argument
+# to one of the "new_" functions below
 _queue_set_pane_title() {
 	if [ "$#" -ge 5 ]; then
 		tmux_batch_add select-pane -t "${1}:${2}.${4}" -T "$5"

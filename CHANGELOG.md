@@ -6,6 +6,7 @@
   and panes: tmux commands are batched and the process list is read once
   instead of once per pane.
 - bugfix: active pane is now restored when there's no attached tmux client.
+- bugfix: pane titles ending in ';' are now restored intact.
 
 ### v4.0.0, 2022-04-10
 - Proper handling of `automatic-rename` window option.

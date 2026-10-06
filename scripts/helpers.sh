@@ -75,16 +75,15 @@ get_grouped_sessions() {
 
 # batched tmux commands
 #
-# Saving and restoring big environments is slow because every tmux command
-# starts a new tmux client. `tmux_batch_add` queues commands, and the queue
-# goes to the tmux server in chunks, as one command sequence: "cmd1 \; cmd2".
+# starting a tmux client per command makes big saves and restores slow
+# tmux_batch_add queues commands to send to the server in chunks,
+# as one command sequence: "cmd1 \; cmd2"
 
 TMUX_BATCH_ARGS=()
 TMUX_BATCH_COUNT=0
 TMUX_BATCH_BYTES=0
 TMUX_BATCH_OUTPUT=""
-# tmux refuses commands longer than about 16 kB. These limits stay well below
-# that size.
+# tmux refuses commands longer than about 16 kB, stay well below that
 TMUX_BATCH_MAX_COUNT=100
 TMUX_BATCH_MAX_BYTES=8000
 
@@ -94,7 +93,7 @@ tmux_batch_add() {
 		TMUX_BATCH_ARGS+=(";")
 	fi
 	for arg in "$@"; do
-		# tmux reads a trailing ';' as a command separator. Escape it.
+		# tmux takes a trailing ';' as a command separator, escape it
 		if [[ "$arg" == *";" ]]; then
 			arg="${arg%;}\\;"
 		fi
@@ -110,8 +109,8 @@ _tmux_batch_reset() {
 	TMUX_BATCH_BYTES=0
 }
 
-# Runs the queued commands once and stores their output in TMUX_BATCH_OUTPUT.
-# tmux stops a command sequence at the first command that fails.
+# Runs the queued commands once, output is stored in TMUX_BATCH_OUTPUT.
+# tmux stops a command sequence at the first failing command.
 tmux_batch_run() {
 	TMUX_BATCH_OUTPUT=""
 	if [ "$TMUX_BATCH_COUNT" -gt 0 ]; then
@@ -120,9 +119,9 @@ tmux_batch_run() {
 	_tmux_batch_reset
 }
 
-# Queues many commands that are safe to run more than once. The queue runs
-# automatically when it gets big. If a chunk fails, its commands run again
-# one by one, so one failure does not skip the other commands.
+# queue commands that are safe to run twice, flush when the queue gets big
+# if a chunk fails, rerun its commands one by one so a single failure
+# doesn't skip the rest
 tmux_batch_queue() {
 	tmux_batch_add "$@"
 	if [ "$TMUX_BATCH_COUNT" -ge "$TMUX_BATCH_MAX_COUNT" ] ||

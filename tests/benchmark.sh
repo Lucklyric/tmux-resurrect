@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# Benchmarks save and restore on a big, generated tmux environment.
+# benchmark save and restore on a big, generated tmux environment
 #
-# Runs on a separate tmux server with its own socket. It does not change your
-# tmux sessions.
+# run on a separate tmux server with its own socket
+# your tmux sessions are not touched
 #
 # Usage:
 #   tests/benchmark.sh [-p plugin_dir] [-s sessions] [-w windows] [-n panes]
@@ -13,7 +13,7 @@
 #   -s  number of sessions                 (default: 6)
 #   -w  number of windows per session      (default: 10)
 #   -n  number of panes per window         (default: 4)
-#   -r  number of save runs, reports the median (default: 3)
+#   -r  number of save runs, the median is reported (default: 3)
 #   -c  attach a tmux client during restore (default: no client)
 #
 # Prints one CSV line:
@@ -22,11 +22,10 @@
 #   save_s           saving, pane contents off
 #   save_contents_s  saving, pane contents on
 #   restore_s        restoring into an empty server (pane contents off)
-#   pane_create_s    time tmux needs to create the same panes one by one.
-#                    This is the lower limit for restore_s.
-#   roundtrip        "ok" if a save after restore makes the same file (the
-#                    check ignores pane ids). Otherwise, the number of lines
-#                    that differ.
+#   pane_create_s    time tmux itself needs to create the same panes one by
+#                    one, a lower bound for restore_s
+#   roundtrip        "ok" if saving after restore gives the same file
+#                    (ignoring pane ids), number of differing lines otherwise
 
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
@@ -93,14 +92,14 @@ set_options() {
 	t set -g @resurrect-dir "$WORK_DIR/resurrect"
 	t set -g @resurrect-processes '"~sleep->sleep *"'
 	t set -g history-limit 2000
-	# use a plain shell. Then the startup time and title escapes of the user's
-	# shell do not change the timings or the roundtrip check.
+	# plain shell, so the startup time and title escapes of the user's shell
+	# don't affect the timings or the roundtrip check
 	t set -g default-shell /bin/sh
 }
 
-# One tmux command creates the panes and the tiled layout of each window.
-# Every 3rd window runs a process that the restore starts again. Every pane
-# has some output.
+# create each window's panes and tiled layout with one tmux command
+# every 3rd window runs a process that should be restored
+# every pane has some output
 create_environment() {
 	local s w p
 	local -a cmd
@@ -136,7 +135,7 @@ attach_client() {
 	sleep 1
 }
 
-# removes layout checksums and pane ids. They change on every restore.
+# removes layout checksums and pane ids, they change on every restore
 normalize() {
 	awk 'BEGIN { FS = OFS = "\t" }
 		$1 == "window" {
@@ -178,7 +177,7 @@ main() {
 	local start end
 	mkdir -p "$WORK_DIR/resurrect"
 
-	# lower limit: tmux creates the same panes one by one, as restore does
+	# lower bound: tmux creating the same panes one by one, like restore does
 	t new-session -d -s "s0" -x 250 -y 80 -c /tmp
 	start="$(now)"
 	local s w p
